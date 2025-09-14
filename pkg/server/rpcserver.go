@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"mapreduce/pkg/coordinator"
@@ -23,7 +24,7 @@ func NewRPCServer(master *coordinator.Master, log *log.Logger) *RPCServer {
 	}
 }
 
-func (server *RPCServer) GetTask(request *rpcpb.GetTaskArgs) (*rpcpb.GetTaskReply, error) {
+func (server *RPCServer) GetTask(ctx context.Context, request *rpcpb.GetTaskArgs) (*rpcpb.GetTaskReply, error) {
 	workerID := request.GetWorkerId()
 	spec, ok := server.master.PollTask(workerID)
 	nMap, nReduce := server.master.Totals()

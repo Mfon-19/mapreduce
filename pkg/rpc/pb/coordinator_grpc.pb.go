@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.0
-// source: coordinator.proto
+// source: control.proto
 
 package rpcpb
 
@@ -117,5 +117,5 @@ var Coordinator_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "coordinator.proto",
+	Metadata: "control.proto",
 }

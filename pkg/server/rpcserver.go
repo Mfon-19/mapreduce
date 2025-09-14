@@ -17,7 +17,7 @@ type RPCServer struct {
 	log    *log.Logger
 }
 
-func NewRPCServer(master *coordinator.Master, log *log.Logger) *RPCServer {
+func NewRPCServer(ctx context.Context, master *coordinator.Master, log *log.Logger) *RPCServer {
 	return &RPCServer{
 		master: master,
 		log:    log,

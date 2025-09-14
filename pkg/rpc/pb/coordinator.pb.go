@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.0
-// source: coordinator.proto
+// source: control.proto
 
 package rpcpb
 

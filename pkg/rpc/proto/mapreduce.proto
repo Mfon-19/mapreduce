@@ -5,28 +5,31 @@ package rpc.proto;
 option go_package = "mapreduce/pkg/rpc/pb;rpcpb";
 
 enum TaskType {
-    TaskNone   = 0;      // no work yet; worker should wait and retry
-    TaskMap    = 1;      // do a map task
-    TaskReduce = 2;      // do a reduce task
-    TaskExit   = 3;      // all done; worker should exit
+    TaskNone   = 0;
+    TaskMap    = 1;
+    TaskReduce = 2;
+    TaskExit   = 3;
 }
 
 message GetTaskArgs {
     string worker_id = 1;
-}   // worker sends this to the master to request task args
-
-message GetTaskReply {
-    TaskType type   = 1;     // what kind of task the worker should do
-    int32 map_id    = 2;		 // valid if Type==TaskMap
-    int32 reduce_id = 3;		 // valid if Type==TaskReduce
-    string filename = 4;		 // valid if Type==TaskReduce (input file)
-    int32 n_map     = 5;		 // total number of map tasks
-    int32 n_reduce  = 6; 		 // total number of reduce tasks
 }
 
-// for worker to respond when done with task
+message GetTaskReply {
+    TaskType type           = 1;
+    int32 map_id            = 2;
+    int32 reduce_id         = 3;
+    string filename         = 4;
+    int32 n_map             = 5;
+    int32 n_reduce          = 6;
+    string job_id           = 7;
+    string plugin_path      = 8;
+    string map_symbol       = 9;
+    string reduce_symbol    = 10;
+}
+
 message ReportTaskArgs {
-    TaskType type       = 1;       // TaskMap or TaskReduce
+    TaskType type       = 1;
     int32 map_id        = 2;
     int32 reduce_id     = 3;
     bool success        = 4;

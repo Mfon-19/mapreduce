@@ -25,6 +25,9 @@ type SubmitJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	InputFiles    []string               `protobuf:"bytes,1,rep,name=input_files,json=inputFiles,proto3" json:"input_files,omitempty"`
 	NReduce       int32                  `protobuf:"varint,2,opt,name=n_reduce,json=nReduce,proto3" json:"n_reduce,omitempty"`
+	PluginPath    string                 `protobuf:"bytes,3,opt,name=plugin_path,json=pluginPath,proto3" json:"plugin_path,omitempty"`
+	MapSymbol     string                 `protobuf:"bytes,4,opt,name=map_symbol,json=mapSymbol,proto3" json:"map_symbol,omitempty"`
+	ReduceSymbol  string                 `protobuf:"bytes,5,opt,name=reduce_symbol,json=reduceSymbol,proto3" json:"reduce_symbol,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,6 +74,27 @@ func (x *SubmitJobRequest) GetNReduce() int32 {
 		return x.NReduce
 	}
 	return 0
+}
+
+func (x *SubmitJobRequest) GetPluginPath() string {
+	if x != nil {
+		return x.PluginPath
+	}
+	return ""
+}
+
+func (x *SubmitJobRequest) GetMapSymbol() string {
+	if x != nil {
+		return x.MapSymbol
+	}
+	return ""
+}
+
+func (x *SubmitJobRequest) GetReduceSymbol() string {
+	if x != nil {
+		return x.ReduceSymbol
+	}
+	return ""
 }
 
 type SubmitJobResponse struct {
@@ -121,11 +145,16 @@ var File_coordinator_proto protoreflect.FileDescriptor
 
 const file_coordinator_proto_rawDesc = "" +
 	"\n" +
-	"\x11coordinator.proto\x12\trpc.proto\"N\n" +
+	"\x11coordinator.proto\x12\trpc.proto\"\xb3\x01\n" +
 	"\x10SubmitJobRequest\x12\x1f\n" +
 	"\vinput_files\x18\x01 \x03(\tR\n" +
 	"inputFiles\x12\x19\n" +
-	"\bn_reduce\x18\x02 \x01(\x05R\anReduce\"*\n" +
+	"\bn_reduce\x18\x02 \x01(\x05R\anReduce\x12\x1f\n" +
+	"\vplugin_path\x18\x03 \x01(\tR\n" +
+	"pluginPath\x12\x1d\n" +
+	"\n" +
+	"map_symbol\x18\x04 \x01(\tR\tmapSymbol\x12#\n" +
+	"\rreduce_symbol\x18\x05 \x01(\tR\freduceSymbol\"*\n" +
 	"\x11SubmitJobResponse\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId2U\n" +
 	"\vCoordinator\x12F\n" +

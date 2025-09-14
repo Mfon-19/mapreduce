@@ -11,6 +11,9 @@ service Coordinator {
 message SubmitJobRequest {
   repeated string input_files = 1;
   int32 n_reduce              = 2;
+  string plugin_path          = 3;
+  string map_symbol           = 4;
+  string reduce_symbol        = 5;
 }
 
 message SubmitJobResponse {

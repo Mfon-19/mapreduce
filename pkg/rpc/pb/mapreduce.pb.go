@@ -24,10 +24,10 @@ const (
 type TaskType int32
 
 const (
-	TaskType_TaskNone   TaskType = 0 // no work yet; worker should wait and retry
-	TaskType_TaskMap    TaskType = 1 // do a map task
-	TaskType_TaskReduce TaskType = 2 // do a reduce task
-	TaskType_TaskExit   TaskType = 3 // all done; worker should exit
+	TaskType_TaskNone   TaskType = 0
+	TaskType_TaskMap    TaskType = 1
+	TaskType_TaskReduce TaskType = 2
+	TaskType_TaskExit   TaskType = 3
 )
 
 // Enum value maps for TaskType.
@@ -119,12 +119,16 @@ func (x *GetTaskArgs) GetWorkerId() string {
 
 type GetTaskReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          TaskType               `protobuf:"varint,1,opt,name=type,proto3,enum=rpc.proto.TaskType" json:"type,omitempty"` // what kind of task the worker should do
-	MapId         int32                  `protobuf:"varint,2,opt,name=map_id,json=mapId,proto3" json:"map_id,omitempty"`          // valid if Type==TaskMap
-	ReduceId      int32                  `protobuf:"varint,3,opt,name=reduce_id,json=reduceId,proto3" json:"reduce_id,omitempty"` // valid if Type==TaskReduce
-	Filename      string                 `protobuf:"bytes,4,opt,name=filename,proto3" json:"filename,omitempty"`                  // valid if Type==TaskReduce (input file)
-	NMap          int32                  `protobuf:"varint,5,opt,name=n_map,json=nMap,proto3" json:"n_map,omitempty"`             // total number of map tasks
-	NReduce       int32                  `protobuf:"varint,6,opt,name=n_reduce,json=nReduce,proto3" json:"n_reduce,omitempty"`    // total number of reduce tasks
+	Type          TaskType               `protobuf:"varint,1,opt,name=type,proto3,enum=rpc.proto.TaskType" json:"type,omitempty"`
+	MapId         int32                  `protobuf:"varint,2,opt,name=map_id,json=mapId,proto3" json:"map_id,omitempty"`
+	ReduceId      int32                  `protobuf:"varint,3,opt,name=reduce_id,json=reduceId,proto3" json:"reduce_id,omitempty"`
+	Filename      string                 `protobuf:"bytes,4,opt,name=filename,proto3" json:"filename,omitempty"`
+	NMap          int32                  `protobuf:"varint,5,opt,name=n_map,json=nMap,proto3" json:"n_map,omitempty"`
+	NReduce       int32                  `protobuf:"varint,6,opt,name=n_reduce,json=nReduce,proto3" json:"n_reduce,omitempty"`
+	JobId         string                 `protobuf:"bytes,7,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	PluginPath    string                 `protobuf:"bytes,8,opt,name=plugin_path,json=pluginPath,proto3" json:"plugin_path,omitempty"`
+	MapSymbol     string                 `protobuf:"bytes,9,opt,name=map_symbol,json=mapSymbol,proto3" json:"map_symbol,omitempty"`
+	ReduceSymbol  string                 `protobuf:"bytes,10,opt,name=reduce_symbol,json=reduceSymbol,proto3" json:"reduce_symbol,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -201,10 +205,37 @@ func (x *GetTaskReply) GetNReduce() int32 {
 	return 0
 }
 
-// for worker to respond when done with task
+func (x *GetTaskReply) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *GetTaskReply) GetPluginPath() string {
+	if x != nil {
+		return x.PluginPath
+	}
+	return ""
+}
+
+func (x *GetTaskReply) GetMapSymbol() string {
+	if x != nil {
+		return x.MapSymbol
+	}
+	return ""
+}
+
+func (x *GetTaskReply) GetReduceSymbol() string {
+	if x != nil {
+		return x.ReduceSymbol
+	}
+	return ""
+}
+
 type ReportTaskArgs struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          TaskType               `protobuf:"varint,1,opt,name=type,proto3,enum=rpc.proto.TaskType" json:"type,omitempty"` // TaskMap or TaskReduce
+	Type          TaskType               `protobuf:"varint,1,opt,name=type,proto3,enum=rpc.proto.TaskType" json:"type,omitempty"`
 	MapId         int32                  `protobuf:"varint,2,opt,name=map_id,json=mapId,proto3" json:"map_id,omitempty"`
 	ReduceId      int32                  `protobuf:"varint,3,opt,name=reduce_id,json=reduceId,proto3" json:"reduce_id,omitempty"`
 	Success       bool                   `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
@@ -320,14 +351,21 @@ const file_mapreduce_proto_rawDesc = "" +
 	"\n" +
 	"\x0fmapreduce.proto\x12\trpc.proto\"*\n" +
 	"\vGetTaskArgs\x12\x1b\n" +
-	"\tworker_id\x18\x01 \x01(\tR\bworkerId\"\xb7\x01\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\"\xb3\x02\n" +
 	"\fGetTaskReply\x12'\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x13.rpc.proto.TaskTypeR\x04type\x12\x15\n" +
 	"\x06map_id\x18\x02 \x01(\x05R\x05mapId\x12\x1b\n" +
 	"\treduce_id\x18\x03 \x01(\x05R\breduceId\x12\x1a\n" +
 	"\bfilename\x18\x04 \x01(\tR\bfilename\x12\x13\n" +
 	"\x05n_map\x18\x05 \x01(\x05R\x04nMap\x12\x19\n" +
-	"\bn_reduce\x18\x06 \x01(\x05R\anReduce\"\xa4\x01\n" +
+	"\bn_reduce\x18\x06 \x01(\x05R\anReduce\x12\x15\n" +
+	"\x06job_id\x18\a \x01(\tR\x05jobId\x12\x1f\n" +
+	"\vplugin_path\x18\b \x01(\tR\n" +
+	"pluginPath\x12\x1d\n" +
+	"\n" +
+	"map_symbol\x18\t \x01(\tR\tmapSymbol\x12#\n" +
+	"\rreduce_symbol\x18\n" +
+	" \x01(\tR\freduceSymbol\"\xa4\x01\n" +
 	"\x0eReportTaskArgs\x12'\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x13.rpc.proto.TaskTypeR\x04type\x12\x15\n" +
 	"\x06map_id\x18\x02 \x01(\x05R\x05mapId\x12\x1b\n" +

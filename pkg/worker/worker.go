@@ -11,32 +11,27 @@ import (
 	"io"
 	"log"
 	rpcpb "mapreduce/pkg/rpc/pb"
+	"mapreduce/pkg/sdk"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"plugin"
 	"sort"
 	"strings"
 	"time"
 )
 
-type KeyValue struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-type MapFunc func(filename string, contents []byte) ([]KeyValue, error)
-type ReduceFunc func(key string, values []string) (string, error)
-
 type Worker struct {
-	id      string
-	client  rpcpb.MapReduceClient
-	workDir string
-	mapf    MapFunc
-	reducef ReduceFunc
-	lg      *log.Logger
+	id       string
+	client   rpcpb.MapReduceClient
+	workDir  string
+	mapf     sdk.MapFunc
+	reducef  sdk.ReduceFunc
+	lg       *log.Logger
+	curJobID string
 }
 
-func NewWorker(conn *grpc.ClientConn, workDir string, workerID string, mapf MapFunc, reducef ReduceFunc, lg *log.Logger) *Worker {
+func NewWorker(conn *grpc.ClientConn, workDir string, workerID string, lg *log.Logger) *Worker {
 	if lg == nil {
 		lg = log.New(os.Stdout, "worker", log.LstdFlags|log.Lmicroseconds)
 	}
@@ -44,8 +39,6 @@ func NewWorker(conn *grpc.ClientConn, workDir string, workerID string, mapf MapF
 		id:      workerID,
 		client:  rpcpb.NewMapReduceClient(conn),
 		workDir: workDir,
-		mapf:    mapf,
-		reducef: reducef,
 		lg:      lg,
 	}
 }
@@ -77,7 +70,20 @@ func (worker *Worker) Run(ctx context.Context) error {
 			return nil
 
 		case rpcpb.TaskType_TaskMap:
-			ok := worker.doMap(ctx, int(rep.MapId), rep.Filename, int(rep.NReduce))
+			mapf, _, err := worker.ensurePlugin(rep.JobId, rep.PluginPath, rep.MapSymbol, rep.ReduceSymbol)
+			if err != nil {
+				worker.lg.Printf("ensurePlugin(job=%s) failed: %v", rep.JobId, err)
+				_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
+					Type:     rpcpb.TaskType_TaskMap,
+					MapId:    rep.MapId,
+					Success:  false,
+					WorkerId: worker.id,
+				})
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+
+			ok := worker.doMap(ctx, int(rep.MapId), rep.Filename, int(rep.NReduce), mapf)
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskMap,
 				MapId:    rep.MapId,
@@ -86,7 +92,20 @@ func (worker *Worker) Run(ctx context.Context) error {
 			})
 
 		case rpcpb.TaskType_TaskReduce:
-			ok := worker.doReduce(ctx, int(rep.ReduceId), int(rep.NMap))
+			_, reducef, err := worker.ensurePlugin(rep.JobId, rep.PluginPath, rep.MapSymbol, rep.ReduceSymbol)
+			if err != nil {
+				worker.lg.Printf("ensurePlugin(job=%s) failed: %v", rep.JobId, err)
+				_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
+					Type:     rpcpb.TaskType_TaskReduce,
+					MapId:    rep.ReduceId,
+					Success:  false,
+					WorkerId: worker.id,
+				})
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+
+			ok := worker.doReduce(ctx, int(rep.ReduceId), int(rep.NMap), reducef)
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskReduce,
 				ReduceId: rep.ReduceId,
@@ -100,16 +119,65 @@ func (worker *Worker) Run(ctx context.Context) error {
 	}
 }
 
+func (worker *Worker) ensurePlugin(jobID, pluginPath, mapSym, reduceSym string) (sdk.MapFunc, sdk.ReduceFunc, error) {
+	if worker.curJobID == jobID && worker.mapf != nil && worker.reducef != nil {
+		return worker.mapf, worker.reducef, nil
+	}
+	if pluginPath == "" {
+		return nil, nil, fmt.Errorf("empty plugin path for job %s", jobID)
+	}
+
+	local := pluginPath
+	if strings.HasPrefix(local, "file://") {
+		local = strings.TrimPrefix(local, "file://")
+	}
+	abs, err := filepath.Abs(local)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return nil, nil, err
+	}
+
+	p, err := plugin.Open(abs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mp, err := p.Lookup(mapSym)
+	if err != nil {
+		return nil, nil, err
+	}
+	rp, err := p.Lookup(reduceSym)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapf, ok := mp.(sdk.MapFunc)
+	if !ok {
+		return nil, nil, fmt.Errorf("map symbol %s wrong type", mapSym)
+	}
+	reducef, ok := rp.(sdk.ReduceFunc)
+	if !ok {
+		return nil, nil, fmt.Errorf("reduce symbol %s wrong type", reduceSym)
+	}
+
+	worker.curJobID = jobID
+	worker.mapf = mapf
+	worker.reducef = reducef
+	return mapf, reducef, nil
+}
+
 // doMap reads the input file, applies mapf, partitions the result into nReduce buckets,
 // and writes files with name mr-<mapID>-<reduceID>.
-func (worker *Worker) doMap(ctx context.Context, mapID int, filename string, nReduce int) bool {
+func (worker *Worker) doMap(ctx context.Context, mapID int, filename string, nReduce int, mapf sdk.MapFunc) bool {
 	start := time.Now()
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		worker.lg.Printf("map %d: read %s: %v", mapID, filename, err)
 		return false
 	}
-	pairs, err := worker.mapf(filename, data)
+	pairs, err := mapf(filename, data)
 	if err != nil {
 		worker.lg.Printf("map %d: mapf failed: %v", mapID, err)
 		return false
@@ -160,9 +228,9 @@ func (worker *Worker) doMap(ctx context.Context, mapID int, filename string, nRe
 
 // doReduce reads all mr-<mapID>-<reduceID> files produced by doMap, groups by key, applies reducef,
 // and finally writes files with name mr-out-<reduceID>.
-func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int) bool {
+func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int, reducef sdk.ReduceFunc) bool {
 	start := time.Now()
-	var kvs []KeyValue
+	var kvs []sdk.KeyValue
 	for m := 0; m < nMap; m++ {
 		path := filepath.Join(worker.workDir, fmt.Sprintf("mr-%d-%d.json", m, reduceID))
 		file, err := os.Open(path)
@@ -177,7 +245,7 @@ func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int) bool
 
 		decoder := json.NewDecoder(bufio.NewReader(file))
 		for {
-			var kv KeyValue
+			var kv sdk.KeyValue
 			if err := decoder.Decode(&kv); err != nil {
 				if errors.Is(err, io.EOF) {
 					break
@@ -213,7 +281,7 @@ func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int) bool
 		for k := i; k < j; k++ {
 			vals = append(vals, kvs[k].Value)
 		}
-		line, err := worker.reducef(key, vals)
+		line, err := reducef(key, vals)
 		if err != nil {
 			_ = out.Close()
 			_ = os.Remove(tmp)

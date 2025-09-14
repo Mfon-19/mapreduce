@@ -37,13 +37,13 @@ func (master *Master) Close() {
 	close(master.sweeperStop)
 }
 
-func (master *Master) SubmitJob(id string, inputs []string, nReduce int, leaseTimeout time.Duration) error {
+func (master *Master) SubmitJob(id string, inputs []string, nReduce int, leaseTimeout time.Duration, pluginPath, mapSym, reduceSym string) error {
 	master.mu.Lock()
 	defer master.mu.Unlock()
 	if master.job != nil && master.job.Phase != core.DonePhase {
 		return errors.New("job already running")
 	}
-	master.job = core.NewJob(id, inputs, nReduce, leaseTimeout)
+	master.job = core.NewJob(id, inputs, nReduce, leaseTimeout, pluginPath, mapSym, reduceSym)
 	// TODO: I want to return the job id as well. maybe
 	return nil
 }
@@ -81,6 +81,17 @@ func (master *Master) ReportTaskResult(workerID string, result core.TaskResult) 
 		}
 	}
 	return false, nil
+}
+
+func (master *Master) JobInfo() (jobID, path, mapSym, reduceSym string, ok bool) {
+	master.mu.Lock()
+	defer master.mu.Unlock()
+
+	if master.job == nil {
+		return "", "", "", "", false
+	}
+	jobID, path, mapSym, reduceSym = master.job.PluginSpec()
+	return jobID, path, mapSym, reduceSym, true
 }
 
 func (master *Master) Heartbeat(workerID string, running []core.TaskSpec) {

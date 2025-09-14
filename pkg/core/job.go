@@ -7,29 +7,35 @@ import (
 )
 
 type Job struct {
-	ID          string
-	InputFiles  []string
-	NReduce     int
-	MapTasks    []Task
-	ReduceTasks []Task
-	Phase       Phase
-	mapDone     int
-	reduceDone  int
-	timeout     time.Duration
-	mu          sync.Mutex
+	ID           string
+	InputFiles   []string
+	NReduce      int
+	MapTasks     []Task
+	ReduceTasks  []Task
+	Phase        Phase
+	mapDone      int
+	reduceDone   int
+	timeout      time.Duration
+	mu           sync.Mutex
+	PluginPath   string
+	MapSymbol    string
+	ReduceSymbol string
 }
 
-func NewJob(id string, inputFiles []string, nReduce int, timeout time.Duration) *Job {
+func NewJob(id string, inputFiles []string, nReduce int, timeout time.Duration, pluginURI, mapSym, reduceSym string) *Job {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 
 	job := &Job{
-		ID:         id,
-		InputFiles: inputFiles,
-		NReduce:    nReduce,
-		Phase:      MapPhase,
-		timeout:    timeout,
+		ID:           id,
+		InputFiles:   inputFiles,
+		NReduce:      nReduce,
+		Phase:        MapPhase,
+		timeout:      timeout,
+		PluginPath:   pluginURI,
+		MapSymbol:    mapSym,
+		ReduceSymbol: reduceSym,
 	}
 
 	nMap := len(inputFiles)
@@ -139,6 +145,10 @@ func (job *Job) RequeueTimedOut(now time.Time) (requeued int) {
 	requeued += job.requeueTimedOutLocked(&job.MapTasks, now)
 	requeued += job.requeueTimedOutLocked(&job.ReduceTasks, now)
 	return
+}
+
+func (job *Job) PluginSpec() (jobID, uri, mapSym, reduceSym string) {
+	return job.ID, job.PluginPath, job.MapSymbol, job.ReduceSymbol
 }
 
 func (job *Job) pickLocked(tasks *[]Task, workerID string, now time.Time) *Task {

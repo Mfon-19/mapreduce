@@ -28,6 +28,7 @@ func (server *RPCServer) GetTask(ctx context.Context, request *rpcpb.GetTaskArgs
 	workerID := request.GetWorkerId()
 	spec, ok := server.master.PollTask(workerID)
 	nMap, nReduce := server.master.Totals()
+	jobID, path, mapSym, reduceSym, haveJob := server.master.JobInfo()
 
 	if !ok {
 		if !server.master.Active() {
@@ -38,29 +39,41 @@ func (server *RPCServer) GetTask(ctx context.Context, request *rpcpb.GetTaskArgs
 			}, nil
 		}
 		return &rpcpb.GetTaskReply{
-			Type:    rpcpb.TaskType_TaskNone,
-			NMap:    int32(nMap),
-			NReduce: int32(nReduce),
+			Type:         rpcpb.TaskType_TaskNone,
+			NMap:         int32(nMap),
+			NReduce:      int32(nReduce),
+			JobId:        jobID,
+			PluginPath:   path,
+			MapSymbol:    mapSym,
+			ReduceSymbol: reduceSym,
 		}, nil
 	}
 
 	reply := &rpcpb.GetTaskReply{
-		NMap:    int32(nMap),
-		NReduce: int32(nReduce),
+		NMap:         int32(nMap),
+		NReduce:      int32(nReduce),
+		JobId:        jobID,
+		PluginPath:   path,
+		MapSymbol:    mapSym,
+		ReduceSymbol: reduceSym,
 	}
-	switch spec.Type {
-	case core.MapTask:
-		reply.Type = rpcpb.TaskType_TaskMap
-		reply.MapId = int32(spec.ID)
-		reply.Filename = spec.Filename
-	case core.ReduceTask:
-		reply.Type = rpcpb.TaskType_TaskReduce
-		reply.ReduceId = int32(spec.ID)
-	case core.TaskExit:
-		reply.Type = rpcpb.TaskType_TaskExit
-	default:
-		reply.Type = rpcpb.TaskType_TaskNone
+
+	if haveJob {
+		switch spec.Type {
+		case core.MapTask:
+			reply.Type = rpcpb.TaskType_TaskMap
+			reply.MapId = int32(spec.ID)
+			reply.Filename = spec.Filename
+		case core.ReduceTask:
+			reply.Type = rpcpb.TaskType_TaskReduce
+			reply.ReduceId = int32(spec.ID)
+		case core.TaskExit:
+			reply.Type = rpcpb.TaskType_TaskExit
+		default:
+			reply.Type = rpcpb.TaskType_TaskNone
+		}
 	}
+
 	return reply, nil
 }
 
@@ -90,7 +103,8 @@ func (server *RPCServer) SubmitJob(request *rpcpb.SubmitJobRequest) (*rpcpb.Subm
 	jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
 	const lease = 30 * time.Second
 
-	if err := server.master.SubmitJob(jobID, request.InputFiles, int(request.NReduce), lease); err != nil {
+	if err := server.master.SubmitJob(jobID, request.InputFiles, int(request.NReduce), lease,
+		request.PluginPath, request.MapSymbol, request.ReduceSymbol); err != nil {
 		return nil, err
 	}
 	return &rpcpb.SubmitJobResponse{JobId: jobID}, nil

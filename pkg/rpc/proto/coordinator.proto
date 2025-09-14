@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package rpc.proto;
+
+option go_package = "mapreduce/pkg/rpc/pb;rpcpb";
+
+service Coordinator {
+  rpc SubmitJob(SubmitJobRequest) returns (SubmitJobResponse);
+}
+
+message SubmitJobRequest {
+  repeated string input_files = 1;
+  int32 n_reduce              = 2;
+}
+
+message SubmitJobResponse {
+  string job_id = 1;
+}

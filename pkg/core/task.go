@@ -1,6 +1,8 @@
 package core
 
-import "time"
+import (
+	"time"
+)
 
 type Task struct {
 	ID        int
@@ -8,4 +10,20 @@ type Task struct {
 	Filename  string
 	State     TaskState
 	StartTime time.Time
+	Assignee  string
+	Attempts  int
+	Deadline  time.Time
+}
+
+type TaskSpec struct {
+	ID       int
+	Type     TaskType
+	Filename string
+}
+
+type TaskResult struct {
+	Type       TaskType
+	ID         int
+	OK         bool
+	MapOutputs []string
 }

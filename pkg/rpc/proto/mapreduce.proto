@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package rpc.proto;
 
-option go_package = "mapreduce/pkg/rpc";
+option go_package = "mapreduce/pkg/rpc/pb;rpcpb";
 
 enum TaskType {
     TaskNone   = 0;      // no work yet; worker should wait and retry
@@ -11,7 +11,9 @@ enum TaskType {
     TaskExit   = 3;      // all done; worker should exit
 }
 
-message GetTaskArgs {}   // worker sends this to the master to request task args
+message GetTaskArgs {
+    string worker_id = 1;
+}   // worker sends this to the master to request task args
 
 message GetTaskReply {
     TaskType type   = 1;     // what kind of task the worker should do
@@ -24,10 +26,11 @@ message GetTaskReply {
 
 // for worker to respond when done with task
 message ReportTaskArgs {
-    TaskType type   = 1;       // TaskMap or TaskReduce
-    int32 map_id    = 2;
-    int32 reduce_id = 3;
-    bool success    = 4;
+    TaskType type       = 1;       // TaskMap or TaskReduce
+    int32 map_id        = 2;
+    int32 reduce_id     = 3;
+    bool success        = 4;
+    string worker_id    = 5;
 }
 
 message ReportTaskReply {}

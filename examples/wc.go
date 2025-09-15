@@ -2,16 +2,16 @@ package examples
 
 import (
 	"fmt"
-	"mapreduce/pkg/worker"
 	"strings"
+	"mapreduce/pkg/sdk"
 )
 
-func WordCountMap(_ string, contents []byte) ([]worker.KeyValue, error) {
+func WordCountMap(_ string, contents []byte) ([]sdk.KeyValue, error) {
 	text := string(contents)
 	fields := strings.Fields(text)
-	kvs := make([]worker.KeyValue, 0, len(fields))
+	kvs := make([]sdk.KeyValue, 0, len(fields))
 	for _, word := range fields {
-		kvs = append(kvs, worker.KeyValue{Key: strings.ToLower(word), Value: "1"})
+		kvs = append(kvs, sdk.KeyValue{Key: strings.ToLower(word), Value: "1"})
 	}
 	return kvs, nil
 }

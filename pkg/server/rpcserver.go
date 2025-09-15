@@ -77,7 +77,7 @@ func (server *RPCServer) GetTask(ctx context.Context, request *rpcpb.GetTaskArgs
 	return reply, nil
 }
 
-func (server *RPCServer) ReportTask(request *rpcpb.ReportTaskArgs) (*rpcpb.ReportTaskReply, error) {
+func (server *RPCServer) ReportTask(ctx context.Context, request *rpcpb.ReportTaskArgs) (*rpcpb.ReportTaskReply, error) {
 	workerID := request.GetWorkerId()
 
 	result := core.TaskResult{OK: request.Success}
@@ -99,7 +99,7 @@ func (server *RPCServer) ReportTask(request *rpcpb.ReportTaskArgs) (*rpcpb.Repor
 	return &rpcpb.ReportTaskReply{}, nil
 }
 
-func (server *RPCServer) SubmitJob(request *rpcpb.SubmitJobRequest) (*rpcpb.SubmitJobResponse, error) {
+func (server *RPCServer) SubmitJob(ctx context.Context, request *rpcpb.SubmitJobRequest) (*rpcpb.SubmitJobResponse, error) {
 	jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
 	const lease = 30 * time.Second
 

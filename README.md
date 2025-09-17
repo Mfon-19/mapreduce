@@ -1,4 +1,4 @@
-# Go MapReduce Framework
+# MapReduce
 
 This project is a simple framework for distributed MapReduce jobs in Go. It's inspired by the original Google MapReduce paper. It uses gRPC for communication between the master and worker nodes. Map and Reduce functions are provided as Go plugins, allowing users to define their own jobs.
 

@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	srv "mapreduce/pkg/server"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -20,14 +18,6 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-		<-ch
-		lg.Println("shutting down...")
-		cancel()
-	}()
 
 	m := coordinator.NewMaster(ctx, lg)
 

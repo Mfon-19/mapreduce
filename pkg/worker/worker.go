@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc"
 	"hash/fnv"
 	"io"
 	"log"
@@ -19,6 +18,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 type Worker struct {
@@ -153,14 +154,16 @@ func (worker *Worker) ensurePlugin(jobID, pluginPath, mapSym, reduceSym string) 
 		return nil, nil, err
 	}
 
-	mapf, ok := mp.(sdk.MapFunc)
+	mapfPtr, ok := mp.(*sdk.MapFunc)
 	if !ok {
-		return nil, nil, fmt.Errorf("map symbol %s wrong type", mapSym)
+		return nil, nil, fmt.Errorf("map symbol %s has wrong type: expected a *sdk.MapFunc, got %T", mapSym, mp)
 	}
-	reducef, ok := rp.(sdk.ReduceFunc)
+	reducefPtr, ok := rp.(*sdk.ReduceFunc)
 	if !ok {
-		return nil, nil, fmt.Errorf("reduce symbol %s wrong type", reduceSym)
+		return nil, nil, fmt.Errorf("reduce symbol %s has wrong type: expected a *sdk.ReduceFunc, got %T", reduceSym, rp)
 	}
+	mapf := *mapfPtr
+	reducef := *reducefPtr
 
 	worker.curJobID = jobID
 	worker.mapf = mapf

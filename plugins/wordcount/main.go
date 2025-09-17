@@ -1,12 +1,12 @@
-package examples
+package main
 
 import (
 	"fmt"
-	"strings"
 	"mapreduce/pkg/sdk"
+	"strings"
 )
 
-func WordCountMap(_ string, contents []byte) ([]sdk.KeyValue, error) {
+var Map sdk.MapFunc = func(filename string, contents []byte) ([]sdk.KeyValue, error) {
 	text := string(contents)
 	fields := strings.Fields(text)
 	kvs := make([]sdk.KeyValue, 0, len(fields))
@@ -16,6 +16,6 @@ func WordCountMap(_ string, contents []byte) ([]sdk.KeyValue, error) {
 	return kvs, nil
 }
 
-func WordCountReduce(key string, values []string) (string, error) {
+var Reduce sdk.ReduceFunc = func(key string, values []string) (string, error) {
 	return fmt.Sprintf("%s %d", key, len(values)), nil
 }

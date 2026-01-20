@@ -147,6 +147,35 @@ func (job *Job) RequeueTimedOut(now time.Time) (requeued int) {
 	return
 }
 
+func (job *Job) RenewLeases(workerID string, running []TaskSpec, now time.Time) int {
+	job.mu.Lock()
+	defer job.mu.Unlock()
+
+	renewed := 0
+	for _, spec := range running {
+		var tasks *[]Task
+		switch spec.Type {
+		case MapTask:
+			tasks = &job.MapTasks
+		case ReduceTask:
+			tasks = &job.ReduceTasks
+		default:
+			continue
+		}
+
+		if spec.ID < 0 || spec.ID >= len(*tasks) {
+			continue
+		}
+		task := &(*tasks)[spec.ID]
+		if task.State != InProgress || task.Assignee != workerID {
+			continue
+		}
+		task.Deadline = now.Add(job.timeout)
+		renewed++
+	}
+	return renewed
+}
+
 func (job *Job) PluginSpec() (jobID, uri, mapSym, reduceSym string) {
 	return job.ID, job.PluginPath, job.MapSymbol, job.ReduceSymbol
 }

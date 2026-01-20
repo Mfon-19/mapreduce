@@ -38,7 +38,23 @@ message ReportTaskArgs {
 
 message ReportTaskReply {}
 
+message RunningTask {
+    TaskType type   = 1;
+    int32 task_id   = 2;
+}
+
+message HeartbeatArgs {
+    string worker_id            = 1;
+    string job_id               = 2;
+    repeated RunningTask running = 3;
+}
+
+message HeartbeatReply {
+    int32 renewed = 1;
+}
+
 service MapReduce {
   rpc GetTask(GetTaskArgs) returns (GetTaskReply);
   rpc ReportTask(ReportTaskArgs) returns (ReportTaskReply);
+  rpc Heartbeat(HeartbeatArgs) returns (HeartbeatReply);
 }

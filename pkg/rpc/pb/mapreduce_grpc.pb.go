@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	MapReduce_GetTask_FullMethodName    = "/rpc.proto.MapReduce/GetTask"
 	MapReduce_ReportTask_FullMethodName = "/rpc.proto.MapReduce/ReportTask"
+	MapReduce_Heartbeat_FullMethodName  = "/rpc.proto.MapReduce/Heartbeat"
 )
 
 // MapReduceClient is the client API for MapReduce service.
@@ -29,6 +30,7 @@ const (
 type MapReduceClient interface {
 	GetTask(ctx context.Context, in *GetTaskArgs, opts ...grpc.CallOption) (*GetTaskReply, error)
 	ReportTask(ctx context.Context, in *ReportTaskArgs, opts ...grpc.CallOption) (*ReportTaskReply, error)
+	Heartbeat(ctx context.Context, in *HeartbeatArgs, opts ...grpc.CallOption) (*HeartbeatReply, error)
 }
 
 type mapReduceClient struct {
@@ -59,12 +61,23 @@ func (c *mapReduceClient) ReportTask(ctx context.Context, in *ReportTaskArgs, op
 	return out, nil
 }
 
+func (c *mapReduceClient) Heartbeat(ctx context.Context, in *HeartbeatArgs, opts ...grpc.CallOption) (*HeartbeatReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatReply)
+	err := c.cc.Invoke(ctx, MapReduce_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MapReduceServer is the server API for MapReduce service.
 // All implementations must embed UnimplementedMapReduceServer
 // for forward compatibility.
 type MapReduceServer interface {
 	GetTask(context.Context, *GetTaskArgs) (*GetTaskReply, error)
 	ReportTask(context.Context, *ReportTaskArgs) (*ReportTaskReply, error)
+	Heartbeat(context.Context, *HeartbeatArgs) (*HeartbeatReply, error)
 	mustEmbedUnimplementedMapReduceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedMapReduceServer) GetTask(context.Context, *GetTaskArgs) (*Get
 }
 func (UnimplementedMapReduceServer) ReportTask(context.Context, *ReportTaskArgs) (*ReportTaskReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportTask not implemented")
+}
+func (UnimplementedMapReduceServer) Heartbeat(context.Context, *HeartbeatArgs) (*HeartbeatReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
 func (UnimplementedMapReduceServer) mustEmbedUnimplementedMapReduceServer() {}
 func (UnimplementedMapReduceServer) testEmbeddedByValue()                   {}
@@ -138,6 +154,24 @@ func _MapReduce_ReportTask_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MapReduce_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatArgs)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MapReduceServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MapReduce_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MapReduceServer).Heartbeat(ctx, req.(*HeartbeatArgs))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MapReduce_ServiceDesc is the grpc.ServiceDesc for MapReduce service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var MapReduce_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReportTask",
 			Handler:    _MapReduce_ReportTask_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _MapReduce_Heartbeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -18,6 +18,8 @@ type Master struct {
 	sweeperStop chan struct{}
 }
 
+const leaseSweepInterval = 2 * time.Second
+
 func NewMaster(ctx context.Context, log *log.Logger) *Master {
 	if ctx == nil {
 		ctx = context.Background()
@@ -29,6 +31,7 @@ func NewMaster(ctx context.Context, log *log.Logger) *Master {
 		log:         log,
 		sweeperStop: make(chan struct{}),
 	}
+	go master.leaseSweeper(leaseSweepInterval)
 	return master
 }
 
@@ -94,8 +97,15 @@ func (master *Master) JobInfo() (jobID, path, mapSym, reduceSym string, ok bool)
 	return jobID, path, mapSym, reduceSym, true
 }
 
-func (master *Master) Heartbeat(workerID string, running []core.TaskSpec) {
-	// TODO: Renew the lease for this worker
+func (master *Master) Heartbeat(workerID, jobID string, running []core.TaskSpec) int {
+	master.mu.Lock()
+	job := master.job
+	master.mu.Unlock()
+
+	if job == nil || job.ID != jobID {
+		return 0
+	}
+	return job.RenewLeases(workerID, running, time.Now())
 }
 
 func (master *Master) leaseSweeper(interval time.Duration) {

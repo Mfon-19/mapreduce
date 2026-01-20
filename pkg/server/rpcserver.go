@@ -99,6 +99,28 @@ func (server *RPCServer) ReportTask(ctx context.Context, request *rpcpb.ReportTa
 	return &rpcpb.ReportTaskReply{}, nil
 }
 
+func (server *RPCServer) Heartbeat(ctx context.Context, request *rpcpb.HeartbeatArgs) (*rpcpb.HeartbeatReply, error) {
+	workerID := request.GetWorkerId()
+	jobID := request.GetJobId()
+
+	running := make([]core.TaskSpec, 0, len(request.GetRunning()))
+	for _, task := range request.GetRunning() {
+		spec := core.TaskSpec{ID: int(task.GetTaskId())}
+		switch task.GetType() {
+		case rpcpb.TaskType_TaskMap:
+			spec.Type = core.MapTask
+		case rpcpb.TaskType_TaskReduce:
+			spec.Type = core.ReduceTask
+		default:
+			continue
+		}
+		running = append(running, spec)
+	}
+
+	renewed := server.master.Heartbeat(workerID, jobID, running)
+	return &rpcpb.HeartbeatReply{Renewed: int32(renewed)}, nil
+}
+
 func (server *RPCServer) SubmitJob(ctx context.Context, request *rpcpb.SubmitJobRequest) (*rpcpb.SubmitJobResponse, error) {
 	jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
 	const lease = 30 * time.Second

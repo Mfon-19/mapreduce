@@ -32,6 +32,11 @@ type Worker struct {
 	curJobID string
 }
 
+const (
+	heartbeatInterval = 10 * time.Second
+	heartbeatTimeout  = 2 * time.Second
+)
+
 func NewWorker(conn *grpc.ClientConn, workDir string, workerID string, lg *log.Logger) *Worker {
 	if lg == nil {
 		lg = log.New(os.Stdout, "worker", log.LstdFlags|log.Lmicroseconds)
@@ -84,7 +89,10 @@ func (worker *Worker) Run(ctx context.Context) error {
 				continue
 			}
 
-			ok := worker.doMap(ctx, int(rep.MapId), rep.Filename, int(rep.NReduce), mapf)
+			task := &rpcpb.RunningTask{Type: rpcpb.TaskType_TaskMap, TaskId: rep.MapId}
+			ok := worker.runWithHeartbeat(ctx, rep.JobId, task, func() bool {
+				return worker.doMap(ctx, int(rep.MapId), rep.Filename, int(rep.NReduce), mapf)
+			})
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskMap,
 				MapId:    rep.MapId,
@@ -106,7 +114,10 @@ func (worker *Worker) Run(ctx context.Context) error {
 				continue
 			}
 
-			ok := worker.doReduce(ctx, int(rep.ReduceId), int(rep.NMap), reducef)
+			task := &rpcpb.RunningTask{Type: rpcpb.TaskType_TaskReduce, TaskId: rep.ReduceId}
+			ok := worker.runWithHeartbeat(ctx, rep.JobId, task, func() bool {
+				return worker.doReduce(ctx, int(rep.ReduceId), int(rep.NMap), reducef)
+			})
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskReduce,
 				ReduceId: rep.ReduceId,
@@ -263,7 +274,7 @@ func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int, redu
 	}
 
 	sort.Slice(kvs, func(i, j int) bool {
-		return kvs[i].Key < kvs[i].Key
+		return kvs[i].Key < kvs[j].Key
 	})
 
 	tmp := worker.tmpPath(fmt.Sprintf("mr-out-%d.txt", reduceID))
@@ -315,6 +326,51 @@ func (worker *Worker) doReduce(ctx context.Context, reduceID int, nMap int, redu
 func (worker *Worker) tmpPath(name string) string {
 	base := strings.TrimSuffix(name, ".tmp")
 	return filepath.Join(worker.workDir, fmt.Sprintf("%s.%s.tmp", base, worker.id))
+}
+
+func (worker *Worker) runWithHeartbeat(ctx context.Context, jobID string, task *rpcpb.RunningTask, fn func() bool) bool {
+	if jobID == "" || task == nil {
+		return fn()
+	}
+
+	hbCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	worker.sendHeartbeat(hbCtx, jobID, task)
+
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(heartbeatInterval)
+		defer ticker.Stop()
+		defer close(done)
+		for {
+			select {
+			case <-hbCtx.Done():
+				return
+			case <-ticker.C:
+				worker.sendHeartbeat(hbCtx, jobID, task)
+			}
+		}
+	}()
+
+	ok := fn()
+	cancel()
+	<-done
+	return ok
+}
+
+func (worker *Worker) sendHeartbeat(ctx context.Context, jobID string, task *rpcpb.RunningTask) {
+	hbCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
+	defer cancel()
+
+	_, err := worker.client.Heartbeat(hbCtx, &rpcpb.HeartbeatArgs{
+		WorkerId: worker.id,
+		JobId:    jobID,
+		Running:  []*rpcpb.RunningTask{task},
+	})
+	if err != nil && hbCtx.Err() == nil {
+		worker.lg.Printf("heartbeat error: %v", err)
+	}
 }
 
 func partition(key string, n int) int {

@@ -19,6 +19,23 @@ This project is a simple framework for distributed MapReduce jobs in Go. It's in
 
 ## Getting Started
 
+### Quick Start (Local)
+
+Run the wordcount example end-to-end on the sample data:
+
+```sh
+make demo
+```
+
+Or without `make`:
+
+```sh
+./scripts/run-local.sh
+```
+
+Outputs will land in `mr-work-*/mr-out-*.txt`. Logs are written to `mr-master.log` and `mr-work-*/worker.log`.
+You can override defaults with `ADDR`, `WORKERS`, `NREDUCE`, `INPUTS`, and `PLUGIN_PATH`.
+
 ### Prerequisites
 
 - Go 1.18 or later.
@@ -40,6 +57,13 @@ This project is a simple framework for distributed MapReduce jobs in Go. It's in
 
     ```sh
     go build -buildmode=plugin -o wordcount.so ./plugins/wordcount
+    ```
+
+    Or use the Makefile:
+
+    ```sh
+    make build
+    make plugin
     ```
 
 ## Usage

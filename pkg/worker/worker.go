@@ -30,12 +30,15 @@ type Worker struct {
 	reducef  sdk.ReduceFunc
 	lg       *log.Logger
 	curJobID string
+	observe  TaskObserver
 }
 
 const (
 	heartbeatInterval = 10 * time.Second
 	heartbeatTimeout  = 2 * time.Second
 )
+
+type TaskObserver func(taskType rpcpb.TaskType, taskID int32, duration time.Duration, ok bool)
 
 func NewWorker(conn *grpc.ClientConn, workDir string, workerID string, lg *log.Logger) *Worker {
 	if lg == nil {
@@ -90,9 +93,13 @@ func (worker *Worker) Run(ctx context.Context) error {
 			}
 
 			task := &rpcpb.RunningTask{Type: rpcpb.TaskType_TaskMap, TaskId: rep.MapId}
+			start := time.Now()
 			ok := worker.runWithHeartbeat(ctx, rep.JobId, task, func() bool {
 				return worker.doMap(ctx, int(rep.MapId), rep.Filename, int(rep.NReduce), mapf)
 			})
+			if worker.observe != nil {
+				worker.observe(rpcpb.TaskType_TaskMap, rep.MapId, time.Since(start), ok)
+			}
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskMap,
 				MapId:    rep.MapId,
@@ -115,9 +122,13 @@ func (worker *Worker) Run(ctx context.Context) error {
 			}
 
 			task := &rpcpb.RunningTask{Type: rpcpb.TaskType_TaskReduce, TaskId: rep.ReduceId}
+			start := time.Now()
 			ok := worker.runWithHeartbeat(ctx, rep.JobId, task, func() bool {
 				return worker.doReduce(ctx, int(rep.ReduceId), int(rep.NMap), reducef)
 			})
+			if worker.observe != nil {
+				worker.observe(rpcpb.TaskType_TaskReduce, rep.ReduceId, time.Since(start), ok)
+			}
 			_, _ = worker.client.ReportTask(ctx, &rpcpb.ReportTaskArgs{
 				Type:     rpcpb.TaskType_TaskReduce,
 				ReduceId: rep.ReduceId,
@@ -129,6 +140,10 @@ func (worker *Worker) Run(ctx context.Context) error {
 			time.Sleep(250 * time.Millisecond)
 		}
 	}
+}
+
+func (worker *Worker) SetTaskObserver(obs TaskObserver) {
+	worker.observe = obs
 }
 
 func (worker *Worker) ensurePlugin(jobID, pluginPath, mapSym, reduceSym string) (sdk.MapFunc, sdk.ReduceFunc, error) {
